@@ -1,8 +1,31 @@
+//#include <HashMap.h>
+
 #include <Bridge.h>
 #include <YunServer.h>
 #include <YunClient.h>
 #include <stdlib.h>
 #include "DHT.h"
+
+////define the max size of the hashtable
+//const byte HASH_SIZE = 5;
+//
+////storage
+//HashType<char*, int> hashRawArray[HASH_SIZE];
+////handles the storage [search,retrieve,insert]
+//HashMap<char*, int> hashMap = HashMap<char*, int>( \hashRawArray , HASH_SIZE );
+
+//void services() {
+//
+//  hashMap[0]("relay1", digitalRead(8));
+//  hashMap[1]("relay2", digitalRead(relay2));
+//  hashMap[2]("relay3", digitalRead(10));
+//  hashMap[3]("temperature", indorTempinC);
+//  hashMap[4]("humidity", indoorHumidity);
+//  hashMap[5]("pirSense", digitalRead(pirPin)
+//
+//  Serial.println(hashMap);
+//}
+
 
 int calibrationTime = 10;
 //the time when the sensor outputs a low impulse
@@ -35,7 +58,7 @@ float hIinCel;  // heat index in celcius of indoor
 
 byte dat [5];  // incoming data array.
 
-int pin;
+
 
 // reference: http://en.wikipedia.org/wiki/Dew_point
 
@@ -113,7 +136,6 @@ void loop() {
       Serial.print("motion detected at ");
       Serial.print(millis() / 1000);
       Serial.println(" sec");
-      //      delay(50);
     }
     takeLowTime = true;
   }
@@ -126,11 +148,7 @@ void loop() {
     }
     // if the sensor is low for more than the given pause,
     // we assume that no more motion is going to happen
-    Serial.print(millis() - lowIn);
-    Serial.print("    ");
-    Serial.print(lockLow);
-    Serial.print("    ");
-    Serial.println(pause);
+
     if (!lockLow && millis() - lowIn > pause) {
       //makes sure this block of code is only executed again after
       //a new motion sequence has been detected
@@ -155,7 +173,7 @@ void loop() {
       if (stat == 1) {
         toggleRelays(client, 8, 1);
       } else {
-        toggleRelays(client,8, 0);
+        toggleRelays(client, 8, 0);
       }
     } else if (command == "relay2") {
       int r_stat = client.parseInt();
@@ -163,7 +181,7 @@ void loop() {
         toggleRelays(client, relay2, 1);
       }
       else {
-        toggleRelays(client,relay2, 0);
+        toggleRelays(client, relay2, 0);
       }
     } else if (command == "relay3") {
       int r_sta = client.parseInt();
@@ -171,7 +189,7 @@ void loop() {
         toggleRelays(client, 10, 1);
       }
       else {
-        toggleRelays(client,10, 0);
+        toggleRelays(client, 10, 0);
       }
     } else if (command == "temperature") {
       // set JSON header
@@ -189,6 +207,20 @@ void loop() {
       client.print("{\"humidity\":\"");
       client.print(indoorHumidity);
       client.print("\"}");
+    } else if (command == "services"){
+      client.println("Status: 200");
+      client.println("Content-type: application/json");
+      client.println();
+      client.print("{\"relays\" : {\"pin\":");
+      client.print(" {\"8\":\"");
+      client.print(digitalRead(8));
+      client.print("\", \"");
+      client.print(relay2);
+      client.print("\":\"");
+      client.print(digitalRead(relay2));
+      client.print("\", \"10\":\"");
+      client.print(digitalRead(10));
+      client.print("\"}}");
     }
     // close connection and free resources.
     client.stop();
