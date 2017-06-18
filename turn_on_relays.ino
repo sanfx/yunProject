@@ -1,10 +1,16 @@
 //#include <HashMap.h>
+#include <Process.h>
 
 #include <Bridge.h>
 #include <YunServer.h>
 #include <YunClient.h>
 #include <stdlib.h>
 #include "DHT.h"
+
+
+Process date;                 // process used to get the date
+int hours, minutes, seconds;  // for the results
+int lastSecond = -1;
 
 ////define the max size of the hashtable
 //const byte HASH_SIZE = 5;
@@ -23,7 +29,7 @@
 //  hashMap[4]("humidity", indoorHumidity);
 //  hashMap[5]("pirSense", digitalRead(pirPin)
 //
-//  Serial.println(hashMap);
+//  SerialUSBprintln(hashMap);
 //}
 
 
@@ -39,7 +45,7 @@ boolean takeLowTime;
 
 int pirPin = 3;    //the digital pin connected to the PIR sensor's output
 int ledPin = 13;
-
+long unsigned int relay3 = 10; // solenoid
 int DHpin = 2; // temp-hum sensor
 
 DHT dhtBedRom(DHpin, DHT22);
@@ -71,20 +77,81 @@ double dewPointFast(double celsius, double humidity)
   return Td;
 }
 
+void waterThePlant()
+{
+  if (lastSecond != seconds) { // if a second has passed
+
+    if (hours <= 9) {
+      SerialUSB.print("0");  // adjust for 0-9
+    }
+    SerialUSB.print(hours);
+    SerialUSB.print(":");
+    if (minutes <= 9) {
+      SerialUSB.print("0");  // adjust for 0-9
+    }
+    SerialUSB.print(minutes);
+    SerialUSB.print(":");
+    if (seconds <= 9) {
+      SerialUSB.print("0");  // adjust for 0-9
+    }
+    SerialUSB.println(seconds);
+
+
+    if ((hours  == 16 || hours == 8 || hours == 12) and (minutes == 10) and (seconds <= 20) ) {
+      digitalWrite(relay3, HIGH);
+      SerialUSB.println("Watering the plant");
+    }
+    else
+    {
+      digitalWrite(relay3, LOW);
+    }
+
+    // restart the date process:
+    if (!date.running()) {
+      date.begin("date");
+      date.addParameter("+%T");
+      date.run();
+    }
+  }
+  //if there's a result from the date process, parse it:
+  while (date.available() > 0) {
+    // get the result of the date process (should be hh:mm:ss):
+    String timeString = date.readString();
+
+    // find the colons:
+    int firstColon = timeString.indexOf(":");
+    int secondColon = timeString.lastIndexOf(":");
+
+    // get the substrings for hour, minute second:
+    String hourString = timeString.substring(0, firstColon);
+    String minString = timeString.substring(firstColon + 1, secondColon);
+    String secString = timeString.substring(secondColon + 1);
+
+    // convert to ints,saving the previous second:
+    hours = hourString.toInt();
+    minutes = minString.toInt();
+    lastSecond = seconds;          // save to do a time comparison
+    seconds = secString.toInt();
+  }
+
+}
+
+
 void setup() {
-  Serial.begin(9600);
+  Bridge.begin();        // initialize Bridge
+  SerialUSB.begin(9600);
   pinMode(pirPin, INPUT);
   pinMode(ledPin, OUTPUT);
   digitalWrite(pirPin, LOW);
 
   //  //give the sensor some time to calibrate
-  Serial.print("calibrating sensor ");
+  SerialUSB.print("calibrating sensor ");
   for (int i = 0; i < calibrationTime; i++) {
-    Serial.print(".");
+    SerialUSB.print(".");
     delay(700);
   }
-  Serial.println(" done");
-  Serial.println("SENSOR ACTIVE");
+  SerialUSB.println(" done");
+  SerialUSB.println("SENSOR ACTIVE");
   pinMode(8, OUTPUT);
   pinMode(relay2, OUTPUT);
   pinMode(10, OUTPUT);
@@ -132,10 +199,10 @@ void loop() {
       //makes sure we wait for a transition to LOW before any further output is made:
       lockLow = false;
       digitalWrite(relay2, HIGH);
-      Serial.println("---");
-      Serial.print("motion detected at ");
-      Serial.print(millis() / 1000);
-      Serial.println(" sec");
+      SerialUSB.println("---");
+      SerialUSB.print("motion detected at ");
+      SerialUSB.print(millis() / 1000);
+      SerialUSB.println(" sec");
     }
     takeLowTime = true;
   }
@@ -154,13 +221,13 @@ void loop() {
       //a new motion sequence has been detected
       lockLow = true;
       digitalWrite(relay2, takeLowTime);
-      Serial.print("motion ended at ");      //output
-      Serial.print((millis() - pause) / 1000);
-      Serial.println(" sec");
+      SerialUSB.print("motion ended at ");      //output
+      SerialUSB.print((millis() - pause) / 1000);
+      SerialUSB.println(" sec");
       delay(50);
     }
   }
-
+  waterThePlant();
   YunClient client = server.accept();
 
   // Is there a new client ?
@@ -207,7 +274,7 @@ void loop() {
       client.print("{\"humidity\":\"");
       client.print(indoorHumidity);
       client.print("\"}");
-    } else if (command == "services"){
+    } else if (command == "services") {
       client.println("Status: 200");
       client.println("Content-type: application/json");
       client.println();
