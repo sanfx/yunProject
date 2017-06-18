@@ -220,7 +220,17 @@ void loop() {
       client.print(digitalRead(relay2));
       client.print("\", \"10\":\"");
       client.print(digitalRead(10));
-      client.print("\"}}");
+      client.print("\"}}, \"sensors\":{\"dht22\":{\"");
+      client.print(DHpin);
+      client.print("\": {\"temperature\":\"");
+      client.print(indorTempinC);
+      client.print("\", \"humidity\":\"");
+      client.print(indoorHumidity);
+      client.print("\"}}, \"pir\": {\"");
+      client.print(pirPin);
+      client.print("\" : \"");
+      client.print(digitalRead(pirPin));
+      client.println("\"}}}");
     }
     // close connection and free resources.
     client.stop();
