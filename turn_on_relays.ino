@@ -1,12 +1,15 @@
 //#include <HashMap.h>
 #include <Process.h>
-
+#include "control.h"
+#include <EEPROM.h>
 #include <Bridge.h>
 #include <YunServer.h>
 #include <YunClient.h>
 #include <stdlib.h>
 #include "DHT.h"
 
+/** the current address in the EEPROM (i.e. which byte we're going to write to next) **/
+int addr = 0;
 
 Process date;                 // process used to get the date
 int hours, minutes, seconds;  // for the results
@@ -32,7 +35,7 @@ int lastSecond = -1;
 //  SerialUSBprintln(hashMap);
 //}
 
-
+unsigned int manualWatering = 0;
 int calibrationTime = 10;
 //the time when the sensor outputs a low impulse
 long unsigned int lowIn;
@@ -103,7 +106,9 @@ void waterThePlant()
     }
     else
     {
-      digitalWrite(relay3, LOW);
+      if (manualWatering == 0) {
+        digitalWrite(relay3, LOW);
+      }
     }
 
     // restart the date process:
@@ -133,9 +138,7 @@ void waterThePlant()
     lastSecond = seconds;          // save to do a time comparison
     seconds = secString.toInt();
   }
-
 }
-
 
 void setup() {
   Bridge.begin();        // initialize Bridge
@@ -144,6 +147,14 @@ void setup() {
   pinMode(ledPin, OUTPUT);
   digitalWrite(pirPin, LOW);
 
+  pinMode(8, OUTPUT);
+  pinMode(relay2, OUTPUT);
+  pinMode(10, OUTPUT);
+  digitalWrite(8, control::getRelayStatus(8));
+  digitalWrite(relay2, control::getRelayStatus(relay2));
+  Bridge.begin();
+  dhtBedRom.begin();
+  pinMode (DHpin, OUTPUT);
   //  //give the sensor some time to calibrate
   SerialUSB.print("calibrating sensor ");
   for (int i = 0; i < calibrationTime; i++) {
@@ -152,12 +163,7 @@ void setup() {
   }
   SerialUSB.println(" done");
   SerialUSB.println("SENSOR ACTIVE");
-  pinMode(8, OUTPUT);
-  pinMode(relay2, OUTPUT);
-  pinMode(10, OUTPUT);
-  Bridge.begin();
-  dhtBedRom.begin();
-  pinMode (DHpin, OUTPUT);
+
   server.listenOnLocalhost();
   server.begin();
 }
@@ -237,27 +243,14 @@ void loop() {
     // is it relay command?
     if (command == "relay") {
       int stat = client.parseInt();
-      if (stat == 1) {
-        toggleRelays(client, 8, 1);
-      } else {
-        toggleRelays(client, 8, 0);
-      }
+      control::toggleRelays(client, 8);
     } else if (command == "relay2") {
       int r_stat = client.parseInt();
-      if (r_stat == 1) {
-        toggleRelays(client, relay2, 1);
-      }
-      else {
-        toggleRelays(client, relay2, 0);
-      }
+      control::toggleRelays(client, relay2);
     } else if (command == "relay3") {
       int r_sta = client.parseInt();
-      if (r_sta == 1) {
-        toggleRelays(client, 10, 1);
-      }
-      else {
-        toggleRelays(client, 10, 0);
-      }
+      control::toggleRelays(client, relay3);
+      manualWatering = int(digitalRead(relay3));
     } else if (command == "temperature") {
       // set JSON header
       client.println("Status: 200");
@@ -287,7 +280,11 @@ void loop() {
       client.print(digitalRead(relay2));
       client.print("\", \"10\":\"");
       client.print(digitalRead(10));
-      client.print("\"}}, \"sensors\":{\"dht22\":{\"");
+      client.print("\"}}, \"EEPROM\":{\"0\":\"");
+      client.print(EEPROM.read(0));
+      client.print("\", \"1\":\"");
+      client.print(EEPROM.read(1));
+      client.print("\"},\"sensors\":{\"dht22\":{\"");
       client.print(DHpin);
       client.print("\": {\"temperature\":\"");
       client.print(indorTempinC);
