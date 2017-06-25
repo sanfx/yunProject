@@ -34,8 +34,12 @@ int lastSecond = -1;
 //
 //  SerialUSBprintln(hashMap);
 //}
-
+////////// manual override ////////////
 unsigned int manualWatering = 0;
+unsigned int manualLightOn = 0;
+///////////////////////////////////////
+
+
 int calibrationTime = 10;
 //the time when the sensor outputs a low impulse
 long unsigned int lowIn;
@@ -46,7 +50,7 @@ long unsigned int pause = 5000;
 boolean lockLow = true;
 boolean takeLowTime;
 
-int pirPin = 3;    //the digital pin connected to the PIR sensor's output
+int pirPin = 3; //the digital pin connected to the PIR sensor's output
 int ledPin = 13;
 long unsigned int relay3 = 10; // solenoid
 int DHpin = 2; // temp-hum sensor
@@ -64,10 +68,6 @@ float tF; // temperature in fahrenheit
 float hi; // heat index in fahrenheit of indoor
 float hIinFah;
 float hIinCel;  // heat index in celcius of indoor
-
-byte dat [5];  // incoming data array.
-
-
 
 // reference: http://en.wikipedia.org/wiki/Dew_point
 
@@ -100,9 +100,9 @@ void waterThePlant()
     SerialUSB.println(seconds);
 
 
-    if ((hours  == 16 || hours == 8 || hours == 12) and (minutes == 10) and (seconds <= 20) ) {
+    if ((hours  == 16 || hours == 8 || hours == 12) and (minutes == 10) and (seconds <= 59) ) {
       digitalWrite(relay3, HIGH);
-      SerialUSB.println("Watering the plant");
+      SerialUSB.println(F("Watering the plant"));
     }
     else
     {
@@ -213,7 +213,7 @@ void loop() {
     takeLowTime = true;
   }
 
-  if (digitalRead(pirPin) == LOW) {
+  if ((digitalRead(pirPin) == LOW) and (manualLightOn == 0)) {
     digitalWrite(ledPin, LOW);  //the led visualizes the sensors output pin state
     if (takeLowTime) {
       lowIn = millis();          //save the time of the transition from high to LOW
@@ -226,7 +226,9 @@ void loop() {
       //makes sure this block of code is only executed again after
       //a new motion sequence has been detected
       lockLow = true;
+
       digitalWrite(relay2, takeLowTime);
+
       SerialUSB.print("motion ended at ");      //output
       SerialUSB.print((millis() - pause) / 1000);
       SerialUSB.println(" sec");
@@ -242,13 +244,23 @@ void loop() {
     command.trim();
     // is it relay command?
     if (command == "relay") {
-      int stat = client.parseInt();
       control::toggleRelays(client, 8);
-    } else if (command == "relay2") {
-      int r_stat = client.parseInt();
+    } else if (command == "disablePIR") {
+      manualLightOn = 1;
+      client.println("Status: 200");
+      client.println("Content-type: application/json");
+      client.println();
+      client.print("{\"PIR Sensor\":\"Disabled\"}");
+    } else if (command == "enablePIR") {
+      manualLightOn = 0;
+      client.println("Status: 200");
+      client.println("Content-type: application/json");
+      client.println();
+      client.print("{\"PIR Sensor\":\"Enabled\"}");
+    }
+    else if (command == "relay2") {
       control::toggleRelays(client, relay2);
     } else if (command == "relay3") {
-      int r_sta = client.parseInt();
       control::toggleRelays(client, relay3);
       manualWatering = int(digitalRead(relay3));
     } else if (command == "temperature") {
