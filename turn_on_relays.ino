@@ -99,14 +99,19 @@ void waterThePlant()
     }
     SerialUSB.println(seconds);
 
-
+    digitalWrite(relay3, LOW);
     if ((hours  == 16 || hours == 8 || hours == 12) and (minutes == 10) and (seconds <= 59) ) {
       digitalWrite(relay3, HIGH);
+//      manualWatering = 0;
       SerialUSB.println(F("Watering the plant"));
     }
+//    else if ((hours  == 21) and (minutes == 56) and (seconds <= 10) ) {
+//      digitalWrite(relay3, HIGH);
+//      SerialUSB.println(F("Watering the plant"));
+//    }
     else
     {
-      if (manualWatering == 0) {
+      if ((manualWatering == 0) || (digitalRead(relay3) == 1)) {
         digitalWrite(relay3, LOW);
       }
     }
@@ -262,7 +267,7 @@ void loop() {
       control::toggleRelays(client, relay2);
     } else if (command == "relay3") {
       control::toggleRelays(client, relay3);
-      manualWatering = int(digitalRead(relay3));
+      // manualWatering = int(digitalRead(relay3));
     } else if (command == "temperature") {
       // set JSON header
       client.println("Status: 200");
